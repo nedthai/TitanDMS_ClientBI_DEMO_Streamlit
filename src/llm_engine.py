@@ -67,10 +67,12 @@ def generate_sql(user_question: str, data_dictionary: str) -> str:
     result = _generate_with_fallback(prompt)
     return result.replace("```sql", "").replace("```", "").strip()
 
-def interpret_results(user_question: str, data_results: str) -> str:
+def interpret_results(user_question: str, data_results: str,
+                      user_chart_preference: str = "Not specified") -> str:
     """Interpret results with transparent key rotation."""
     prompt = INTERPRETATION_PROMPT.format(
         data_results=data_results,
-        user_question=user_question
+        user_question=user_question,
+        user_chart_preference=user_chart_preference,
     )
     return _generate_with_fallback(prompt)

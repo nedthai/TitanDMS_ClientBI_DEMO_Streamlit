@@ -16,13 +16,32 @@ st.set_page_config(
     initial_sidebar_state="collapsed"
 )
 
+# Initialize Session State
+if "messages" not in st.session_state:
+    st.session_state.messages = []
+if "temp_prompt" not in st.session_state:
+    st.session_state.temp_prompt = None
+
 # Custom CSS for Premium Experience
 st.markdown("""
     <style>
-    @import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;700&display=swap');
+    @import url('https://fonts.googleapis.com/css2?family=Rubik:wght@300;400;500;600;700&display=swap');
     
-    html, body, [class*="css"], .stMarkdown, .stText {
-        font-family: 'Outfit', sans-serif !important;
+    html, body, .stMarkdown, .stText, p, h1, h2, h3 {
+        font-family: 'Rubik', sans-serif !important;
+    }
+
+    /* Centering results and unifying widths */
+    .main .block-container {
+        max-width: 850px !important;
+        margin: 0 auto !important;
+        padding-top: 3rem !important;
+    }
+    
+    /* Ensure the input field matches the content width */
+    [data-testid="stBottom"] > div {
+        max-width: 850px !important;
+        margin: 0 auto !important;
     }
 
     /* Vibrant Blurred Background - Lighter Pastel Mix */
@@ -61,7 +80,7 @@ st.markdown("""
         font-weight: 600;
         color: #0f172a;
         text-align: center;
-        margin-top: 0px;    /* Pull closer to logo */
+        margin-top: -10px;    /* Pulled closer to logo */
         margin-bottom: -12px; /* Slightly more space for title */
     }
 
@@ -94,36 +113,60 @@ st.markdown("""
 
     /* Chat Message Bubbles */
     [data-testid="stChatMessage"] {
-        border-radius: 16px !important;
-        padding: 1rem 1.2rem !important;
-        margin-bottom: 1rem !important;
-        border: none !important;
-        max-width: 75%;
+        background-color: transparent !important;
+        margin-bottom: -30px !important;
+        width: 100% !important;
+        padding-right: 0px !important;
+    }
+
+    /* Target the content area within the chat message for bubble styling */
+    [data-testid="stChatMessageContent"] {
+        padding: 0.3rem 0.6rem !important;
+        border-radius: 10px !important;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.03) !important;
+        width: 100% !important;
+        box-sizing: border-box !important;
+        padding-top: 10px !important;
+        padding-bottom: 10px !important;
+    }
+
+    /* Chat Content Styling (Force no borders/shadows) */
+    [data-testid="stChatMessageContent"],
+    [data-testid="stStatusWidget"],
+    [data-testid="stStatusWidget"] > div {
+        border: 1px solid transparent !important;
         box-shadow: none !important;
     }
 
-    /* AI Message */
-    [data-testid="stChatMessage"]:nth-child(odd) {
-        background-color: transparent !important;
-        color: #1e293b !important;
-        align-self: flex-start !important;
-    }
-    
-    /* User Message */
-    [data-testid="stChatMessage"]:nth-child(even) {
+    /* User Message Bubble */
+    [data-testid="stChatMessage"]:nth-child(odd) [data-testid="stChatMessageContent"] {
         background-color: #f8fafc !important;
         color: #0f172a !important;
-        align-self: flex-end !important;
-        margin-left: auto !important;
+    }
+    
+    /* AI Message Bubble */
+    [data-testid="stChatMessage"]:nth-child(even) [data-testid="stChatMessageContent"] {
+        background-color: #ffffff !important;
+        color: #1e293b !important;
+    }
+
+    /* Additional status widget cleanup */
+    [data-testid="stStatusWidget"] {
+        background-color: transparent !important;
     }
 
     /* Input Field Styling */
     [data-testid="stChatInput"] {
-        border-radius: 24px !important;
-        border: 1px solid #e2e8f0 !important;
+        border-radius: 12px !important;
+        border: none !important;
         background: #ffffff !important;
         box-shadow: 0 8px 30px rgba(0,0,0,0.04) !important;
-        padding: 6px !important;
+        padding: 0 !important;
+    }
+    
+    [data-testid="stChatInput"] textarea {
+        padding: 0.15rem 0.3rem !important; /* Ultra-compact (1/3 size) */
+        min-height: unset !important;
     }
 
     /* Sidebar Section Headers (Enlarged & Refined) */
@@ -133,7 +176,7 @@ st.markdown("""
         color: #94a3b8;
         font-weight: 700;   /* Slightly bolder for prominence */
         letter-spacing: 1.2px;
-        margin-bottom: 12px; /* Increased padding below header */
+        margin-bottom: 6px; /* Reduced from 12px as requested */
         margin-top: 18px;
     }
 
@@ -198,12 +241,11 @@ st.markdown("""
         border: 1px solid #f1f5f9 !important;
         font-weight: 500 !important;
         font-size: 0.85rem !important;  /* Slightly smaller for refinement */
-        padding: 0.5rem 1rem !important; /* Narrower/Less thick */
+        padding: 0.4rem 0.8rem !important; /* Balanced padding */
         box-shadow: 0 4px 6px rgba(0,0,0,0.01) !important;
         text-align: center !important;  /* Center the text within the button */
         transition: all 0.2s ease !important;
         margin: 0 auto !important;
-        display: block !important;
     }
     .stButton>button:hover {
         background-color: #ffffff !important;
@@ -212,8 +254,13 @@ st.markdown("""
         transform: translateY(-2px);
     }
 
-    /* Hide default mascot */
-    .mascot { display: none; }
+    /* Dashed Insight Box - override Streamlit's bordered container inner border */
+    [data-testid="stChatMessage"] [data-testid="stVerticalBlockBorderWrapper"] > div {
+        border: 1.8px dashed #a5b4fc !important;
+        border-radius: 10px !important;
+        background: rgba(238, 242, 255, 0.42) !important;
+        padding: 5px 16px !important;
+    }
     </style>
     """, unsafe_allow_html=True)
 
@@ -252,21 +299,52 @@ def get_friendly_name(col):
     clean_name = clean_name.replace("Invoice ", "Sold ")
     return clean_name.strip()
 
+# ── Chart Preference Extraction ──────────────────────────────────────────────
+# Keep this in sync with CHART_TYPE_ALIASES in visualization.py
+_CHART_KEYWORDS = [
+    "stacked column", "stacked bar", "stacked area",
+    "horizontal bar", "grouped bar", "grouped column",
+    "column chart", "column graph",
+    "bar chart", "bar graph",
+    "line chart", "line graph",
+    "pie chart",
+    "donut chart", "doughnut chart",
+    "area chart",
+    "scatter chart", "scatter plot",
+    "histogram",
+    "box chart", "box plot",
+    "violin chart", "violin plot",
+    "treemap", "tree map",
+    "funnel chart",
+    # Single-word fallbacks (order matters — longer phrases above)
+    "column", "bar", "line", "pie", "donut", "doughnut",
+    "area", "scatter", "box", "violin", "funnel",
+]
+
+def extract_chart_preference(question: str) -> str:
+    """Return the chart type phrase if the user mentioned one, else 'Not specified'."""
+    q = question.lower()
+    for kw in _CHART_KEYWORDS:
+        if kw in q:
+            return kw
+    return "Not specified"
+
 # Main Layout Logic
 # Minimalist Sidebar Design
 with st.sidebar:
-    # Sidebar Top Branding
-    _, sb_logo_col, _ = st.columns([1, 1.5, 1])
-    with sb_logo_col:
-        st.image("assets/logo_leftslidebar.png", width=80)
-    
-    st.markdown("""
-        <div style='text-align: center; margin-top: -15px; margin-bottom: 20px;'>
-            <span style='background: linear-gradient(90deg, #4f46e5, #ec4899); -webkit-background-clip: text; -webkit-text-fill-color: transparent; font-weight: 700; font-size: 1.1rem;'>
-                Dealer AI Assistant
-            </span>
-        </div>
-    """, unsafe_allow_html=True)
+    # 0. Sidebar Branding (Conditional)
+    if len(st.session_state.messages) == 0:
+        _, sb_logo_col, _ = st.columns([1, 1.5, 1])
+        with sb_logo_col:
+            st.image("assets/logo.png", width=80)
+        
+        st.markdown("""
+            <div style='text-align: center; margin-top: -15px; margin-bottom: 20px;'>
+                <span style='background: linear-gradient(90deg, #4f46e5, #ec4899); -webkit-background-clip: text; -webkit-text-fill-color: transparent; font-weight: 700; font-size: 1.1rem;'>
+                    Dealer AI Assistant
+                </span>
+            </div>
+        """, unsafe_allow_html=True)
     
     # 1. System Status Section
     st.markdown("<div class='sidebar-header'>SYSTEM STATUS</div>", unsafe_allow_html=True)
@@ -274,8 +352,8 @@ with st.sidebar:
     db_exists = os.path.exists("data/Database_Data.duckdb")
     api_key_exists = os.getenv("GEMINI_API_KEY") is not None
     
-    st.markdown(f"<div class='status-row'>&nbsp;&nbsp;{'🟢' if db_exists else '🔴'} <span style='margin-left: 8px;'>Database: {'Active' if db_exists else 'Fail'}</span></div>", unsafe_allow_html=True)
-    st.markdown(f"<div class='status-row'>&nbsp;&nbsp;{'🟢' if api_key_exists else '🔴'} <span style='margin-left: 8px;'>LLM Model: {'Gemini 1.5 Flash' if api_key_exists else 'Failed'}</span></div>", unsafe_allow_html=True)
+    st.markdown(f"<div class='status-row'>&nbsp;&nbsp;{'🟢' if db_exists else '🔴'} <span style='margin-left: 8px;'>Database Status: {'Active' if db_exists else 'Failed'}</span></div>", unsafe_allow_html=True)
+    st.markdown(f"<div class='status-row'>&nbsp;&nbsp;{'🟢' if api_key_exists else '🔴'} <span style='margin-left: 8px;'>LLM Model: {'Google Gemini' if api_key_exists else 'Failed'}</span></div>", unsafe_allow_html=True)
 
     st.markdown("<div style='height: 15px;'></div>", unsafe_allow_html=True)
     
@@ -294,144 +372,142 @@ with st.sidebar:
         st.session_state.temp_prompt = None
         st.rerun()
 
-# Initialize Session State
-if "messages" not in st.session_state:
-    st.session_state.messages = []
-if "temp_prompt" not in st.session_state:
-    st.session_state.temp_prompt = None
 
 def get_cached_dictionary():
     with open("data/Database_Dictionary.md", "r") as f:
         return f.read()
 
-# Render Welcome Screen or Chat History
-if len(st.session_state.messages) == 0:
-    st.markdown("<div style='height: 5vh;'></div>", unsafe_allow_html=True)
-    
-    # Centered Logo - Using narrower column for precise alignment
-    _, logo_col, _ = st.columns([2, 0.4, 2])
-    with logo_col:
-        st.image("assets/logo_main.png", width=120)
-    
-    st.markdown("<div class='welcome-text'>Hi there,</div>", unsafe_allow_html=True)
-    st.markdown("<div class='gradient-title' style='font-size: 2.2rem;'>Let's get insight into your data with an AI assistant!</div>", unsafe_allow_html=True)
-    st.markdown("<div style='height: 1vh;'></div>", unsafe_allow_html=True)
-    
-    # Suggested Questions - More Refined, Narrower Column
-    _, center_col, _ = st.columns([1.5, 1, 1.5])
-    
-    questions = [
-        ("📈 Monthly Profit Analysis", "What is our total gross profit for the current month?"),
-        ("🚗 Top 5 Inventory Models", "Show me the top 5 vehicle models by stock value."),
-        ("⏳ High-Risk Aged Stock", "Which locations have the highest aged stock over 90 days?"),
-        ("🗺️ Sales Distribution Chart", "Show sales count by location as a bar chart."),
-        ("🔄 Recent Stock Movements", "Recent vehicle movements and their status.")
-    ]
+if st.session_state.temp_prompt:
+    st.session_state.messages.append({"role": "user", "content": st.session_state.temp_prompt})
+    st.session_state.temp_prompt = None
 
-    with center_col:
-        for title, q_text in questions:
-            if st.button(title, use_container_width=True):
-                st.session_state.temp_prompt = q_text
-                st.rerun()
-            
-    st.markdown("<div style='height: 8vh;'></div>", unsafe_allow_html=True)
-
-else:
-    # Display Chat History Loop
-    for message in st.session_state.messages:
-        with st.chat_message(message["role"]):
-            st.markdown(message["content"])
-            if "sql" in message:
-                with st.expander("View SQL Query"):
-                    st.code(message["sql"], language="sql")
-            if "df" in message:
-                st.dataframe(message["df"])
-            if "chart_config" in message:
-                render_chart(message["df"], message["chart_config"])
-
-
-# Chat Input & Logic
+# The Streamlit `st.chat_input` doesn't block, so it's placed anywhere but renders at bottom.
 user_input = st.chat_input("How can I help you today?")
 
-# Handle Quick Question button clicks
-if st.session_state.temp_prompt:
-    user_input = st.session_state.temp_prompt
-    st.session_state.temp_prompt = None # Reset for next run
-
 if user_input:
-    # Add user message to history
     st.session_state.messages.append({"role": "user", "content": user_input})
-    with st.chat_message("user"):
-        st.markdown(user_input)
 
-    # Process AI Response
-    with st.chat_message("assistant"):
-        with st.status("Analyzing Data...", expanded=True) as status:
-            try:
-                # 1. Read Data Dictionary
-                data_dict = get_cached_dictionary()
+# Header Section (Always Visible)
+st.markdown("<div style='height: 2vh;'></div>", unsafe_allow_html=True)
+_, logo_col, _ = st.columns([2, 0.4, 2])
+with logo_col:
+    st.image("assets/logo.png", width=120)
 
-                # 2. Generate SQL
-                status.write("Generating SQL query...")
-                sql = generate_sql(user_input, data_dict)
-                st.code(sql, language="sql")
+st.markdown("<div class='welcome-text'>Hi there,</div>", unsafe_allow_html=True)
+st.markdown("<div class='gradient-title' style='font-size: 2.2rem;'>Let's get insight into your data with an AI assistant!</div>", unsafe_allow_html=True)
+st.markdown("<div style='height: 2vh;'></div>", unsafe_allow_html=True)
 
-                # 3. Execute Query
-                status.write("Executing query on DuckDB...")
-                df = execute_query(sql)
-                
-                if df.empty:
-                    response_text = "I couldn't find any data for that request."
-                    st.markdown(response_text)
-                    st.session_state.messages.append({"role": "assistant", "content": response_text})
+# Display Chat History Loop
+last_message_is_user = False
+if len(st.session_state.messages) > 0:
+    for i, message in enumerate(st.session_state.messages):
+        with st.chat_message(message["role"]):
+            if "sql" in message:
+                with st.expander("🔍 View Generated SQL Query", expanded=False):
+                    st.code(message["sql"], language="sql")
+            if message["content"]:
+                with st.container(border=True):
+                    st.markdown(message["content"])
+            if "df" in message:
+                has_chart = bool(message.get("chart_config"))
+                if has_chart:
+                    tbl_col, chart_col = st.columns([1, 1.4], gap="medium")
+                    with tbl_col:
+                        st.dataframe(
+                            clean_column_names(message["df"].copy()),
+                            use_container_width=True
+                        )
+                    with chart_col:
+                        render_chart(
+                            clean_column_names(message["df"].copy()),
+                            message["chart_config"]
+                        )
                 else:
-                    # Apply User-Friendly Renaming
-                    df_display = clean_column_names(df.copy())
-                    
-                    status.write("Interpreting results...")
-                    # 4. Interpret Results
-                    # Use technical names for interpretation context to keep LLM consistent, 
-                    # but the UI will show friendly names.
-                    data_summary = df.head(20).to_string() 
-                    response_text = interpret_results(user_input, data_summary)
-                    
-                    # 5. Parse Chart Config
-                    chart_config = parse_chart_config(response_text)
-                    
-                    # Clean the response text of the chart config markers for display
-                    clean_response = response_text.split("---")[0].strip()
-                    st.markdown(clean_response)
-                    
-                    # 6. Display Table and Chart
-                    st.dataframe(df_display)
-                    if chart_config:
-                        # Map chart axes to friendly names if they are technical
-                        for key in ["X_AXIS", "Y_AXIS", "COLOR"]:
-                            if key in chart_config and chart_config[key] in df.columns:
-                                chart_config[key] = get_friendly_name(chart_config[key])
-                                
-                        render_chart(df_display, chart_config)
-                    
-                    # Add to session state
-                    st.session_state.messages.append({
-                        "role": "assistant", 
-                        "content": clean_response,
-                        "sql": sql,
-                        "df": df,
-                        "chart_config": chart_config
-                    })
-                
-                status.update(label="Complete!", state="complete", expanded=False)
-            except Exception as e:
-                st.error(f"Error: {e}")
-                status.update(label="Error Occurred", state="error")
+                    st.dataframe(
+                        clean_column_names(message["df"].copy()),
+                        use_container_width=True
+                    )
+        
+        # Check if this is the last message and it's from the user
+        if i == len(st.session_state.messages) - 1 and message["role"] == "user":
+            last_message_is_user = True
 
-# Floating Mascot Decoration
-st.markdown("""
-    <div class='mascot'>
-        <img src='https://cdn-icons-png.flaticon.com/512/4712/4712035.png' width='100'>
-    </div>
-""", unsafe_allow_html=True)
+    # Process AI Response if the last message was from the user
+    if last_message_is_user:
+        user_msg = st.session_state.messages[-1]["content"]
+        with st.chat_message("assistant"):
+            with st.status("Analyzing Data...", expanded=True) as status:
+                try:
+                    # 1. Read Data Dictionary
+                    data_dict = get_cached_dictionary()
 
-# Alternative: If using local assets, Streamlit requires a different approach for fixed positioning.
-# For now, we'll use a high-quality online icon to ensure it works immediately.
+                    # 2. Generate SQL
+                    status.write("Generating SQL query...")
+                    sql = generate_sql(user_msg, data_dict)
+                    with st.expander("🔍 View Generated SQL Query", expanded=False):
+                        st.code(sql, language="sql")
+
+                    # 3. Execute Query
+                    status.write("Executing query on DuckDB...")
+                    df = execute_query(sql)
+                    
+                    if df.empty:
+                        response_text = "I couldn't find any data for that request."
+                        with st.container(border=True):
+                            st.markdown(response_text)
+                        # Add to session state
+                        st.session_state.messages.append({"role": "assistant", "content": response_text})
+                    else:
+                        # Apply User-Friendly Renaming
+                        df_display = clean_column_names(df.copy())
+                        
+                        status.write("Interpreting results...")
+                        # 4. Interpret Results
+                        data_summary = df.head(20).to_string()
+                        chart_pref = extract_chart_preference(user_msg)
+                        response_text = interpret_results(user_msg, data_summary,
+                                                          user_chart_preference=chart_pref)
+                        
+                        # 5. Parse Chart Config
+                        chart_config = parse_chart_config(response_text)
+                        
+                        # Clean the response text (strip chart config block)
+                        clean_response = response_text.split("---")[0].strip()
+
+                        # 6. Display Insight Box (Summarize & Highlight)
+                        with st.container(border=True):
+                            st.markdown(clean_response)
+                        
+                        # 7. Remap chart axis labels to friendly names
+                        if chart_config:
+                            for key in ["X_AXIS", "Y_AXIS", "COLOR"]:
+                                if key in chart_config and chart_config[key] in df.columns:
+                                    chart_config[key] = get_friendly_name(chart_config[key])
+
+                        # 8. Display Table and Chart side-by-side
+                        if chart_config:
+                            tbl_col, chart_col = st.columns([1, 1.4], gap="medium")
+                            with tbl_col:
+                                st.dataframe(df_display, use_container_width=True)
+                            with chart_col:
+                                render_chart(df_display, chart_config)
+                        else:
+                            st.dataframe(df_display, use_container_width=True)
+                        
+                        # Add to session state
+                        st.session_state.messages.append({
+                            "role": "assistant",
+                            "content": clean_response,
+                            "sql": sql,
+                            "df": df,
+                            "chart_config": chart_config
+                        })
+                    
+                    status.update(label="Complete!", state="complete", expanded=False)
+                except Exception as e:
+                    st.error(f"Error: {e}")
+                    status.update(label="Error Occurred", state="error")
+                    st.session_state.messages.append({"role": "assistant", "content": "I encountered an error processing your request."})
+
+    # Reset temp prompt if used
+    st.session_state.temp_prompt = None
