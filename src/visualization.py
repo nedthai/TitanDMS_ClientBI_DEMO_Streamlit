@@ -194,7 +194,8 @@ def render_chart(df: pd.DataFrame, chart_config: dict):
         legend=dict(orientation="h", yanchor="bottom", y=1.02,
                     xanchor="right", x=1),
     )
-    st.plotly_chart(fig, use_container_width=True)
+    st.plotly_chart(fig, width="stretch")
+
 
 
 def parse_chart_config(text: str) -> dict:

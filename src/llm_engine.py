@@ -1,5 +1,5 @@
 import os
-import google.generativeai as genai
+from google import genai
 from dotenv import load_dotenv
 from src.prompts import SQL_GENERATION_PROMPT, INTERPRETATION_PROMPT
 
@@ -7,14 +7,19 @@ load_dotenv()
 
 def _get_api_keys():
     """Returns a list of available API keys from environment."""
-    keys = [os.getenv("GEMINI_API_KEY"), os.getenv("GEMINI_API_KEY_2")]
+    keys = [os.getenv("GEMINI_API_KEY"), os.getenv("GEMINI_API_KEY_2"), os.getenv("GEMINI_API_KEY_3")]
     return [k for k in keys if k]
 
-def get_best_model():
+def get_best_model(client: genai.Client) -> str:
     """Find the best available model for the active API key."""
     try:
-        available_models = [m.name for m in genai.list_models() if 'generateContent' in m.supported_generation_methods]
+        available_models = [m.name for m in client.models.list()]
         preferred = [
+            'gemini-2.5-flash',
+            'gemini-2.5-pro',
+            'gemini-2.0-flash',
+            'gemini-1.5-pro',
+            'gemini-flash-latest',
             'models/gemini-2.5-flash',
             'models/gemini-2.5-pro',
             'models/gemini-2.0-flash',
@@ -24,14 +29,14 @@ def get_best_model():
         
         for p in preferred:
             if p in available_models:
-                return genai.GenerativeModel(p)
+                return p
         
         if available_models:
-            return genai.GenerativeModel(available_models[0])
+            return available_models[0]
             
         raise Exception("No generative models found.")
     except Exception:
-        return genai.GenerativeModel("gemini-1.5-flash")
+        return "gemini-1.5-flash"
 
 def _generate_with_fallback(prompt: str) -> str:
     """Attempts to generate content, rotating keys if a quota error occurs.
@@ -44,9 +49,14 @@ def _generate_with_fallback(prompt: str) -> str:
     last_error = None
     for i, key in enumerate(keys):
         try:
-            genai.configure(api_key=key)
-            model = get_best_model() # Fetch model for this specific key
-            response = model.generate_content(prompt)
+            client = genai.Client(api_key=key)
+            model_name = get_best_model(client) # Fetch model name for this specific key
+            
+            # The new SDK requires using the client to generate content
+            response = client.models.generate_content(
+                model=model_name,
+                contents=prompt
+            )
             return response.text
         except Exception as e:
             last_error = e

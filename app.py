@@ -8,6 +8,7 @@ from src.visualization import render_chart, parse_chart_config
 
 load_dotenv()
 
+
 # Page Configuration
 st.set_page_config(
     page_title="Dealer AI Assistant",
@@ -23,6 +24,7 @@ if "temp_prompt" not in st.session_state:
     st.session_state.temp_prompt = None
 
 # Custom CSS for Premium Experience
+
 st.markdown("""
     <style>
     @import url('https://fonts.googleapis.com/css2?family=Rubik:wght@300;400;500;600;700&display=swap');
@@ -204,8 +206,14 @@ st.markdown("""
         font-size: 1rem;
         opacity: 0.8;
     }
+
+    /* Hide the default Streamlit Multipage Navigation */
+    [data-testid="stSidebarNav"] {
+        display: none !important;
+    }
     
     /* Refined Sidebar Menu Item (Narrower, Left Aligned) */
+
     section[data-testid="stSidebar"] .stButton>button {
         background: none !important;
         background-color: transparent !important;
@@ -260,6 +268,36 @@ st.markdown("""
         border-radius: 10px !important;
         background: rgba(238, 242, 255, 0.42) !important;
         padding: 5px 16px !important;
+    }
+
+    /* Sidebar Navigation Link (Mimic Sidebar Buttons) */
+    .sidebar-nav-link {
+        color: #475569 !important;
+        text-decoration: none !important;
+        padding: 0.45rem 0.6rem !important; /* Refined to match button padding */
+        font-weight: 500 !important;
+        font-size: 0.85rem !important;
+        display: flex !important;
+        align-items: center !important;
+        transition: all 0.2s ease !important;
+        width: fit-content !important;
+        min-width: 160px !important;
+        border-radius: 8px !important;
+        font-family: 'Rubik', sans-serif !important;
+        line-height: 1.25 !important;
+    }
+    .sidebar-nav-link:hover {
+        background-color: #f1f5f9 !important;
+        color: #0f172a !important;
+        transform: translateX(3px) !important;
+    }
+    .sidebar-nav-link span {
+        margin-right: 12px;
+        font-size: 1rem;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 18px; /* Consistent icon width */
     }
     </style>
     """, unsafe_allow_html=True)
@@ -366,6 +404,15 @@ with st.sidebar:
     # 3. Assistant Actions Section
     st.markdown("<div class='sidebar-header'>ASSISTANT ACTIONS</div>", unsafe_allow_html=True)
     
+    # User Guide Link (With consistent icon container)
+    st.markdown("""
+        <a href="/User_Guide" target="_blank" class="sidebar-nav-link" style="margin-left: 2px; margin-top: -5px;">
+            <span>📖</span>User Guide
+        </a>
+        <div style="height: 4px;"></div>
+    """, unsafe_allow_html=True)
+
+
     # Left-aligned, narrow action link
     if st.button("🗑️&nbsp;&nbsp;Clear chat history", key="trigger_clear", help=None, use_container_width=False):
         st.session_state.messages = []
@@ -384,6 +431,7 @@ if st.session_state.temp_prompt:
 # The Streamlit `st.chat_input` doesn't block, so it's placed anywhere but renders at bottom.
 user_input = st.chat_input("How can I help you today?")
 
+
 if user_input:
     st.session_state.messages.append({"role": "user", "content": user_input})
 
@@ -395,7 +443,10 @@ with logo_col:
 
 st.markdown("<div class='welcome-text'>Hi there,</div>", unsafe_allow_html=True)
 st.markdown("<div class='gradient-title' style='font-size: 2.2rem;'>Let's get insight into your data with an AI assistant!</div>", unsafe_allow_html=True)
+
+# User Guide Navigation (Moved to Sidebar)
 st.markdown("<div style='height: 2vh;'></div>", unsafe_allow_html=True)
+
 
 # Display Chat History Loop
 last_message_is_user = False
@@ -415,7 +466,7 @@ if len(st.session_state.messages) > 0:
                     with tbl_col:
                         st.dataframe(
                             clean_column_names(message["df"].copy()),
-                            use_container_width=True
+                            width="stretch"
                         )
                     with chart_col:
                         render_chart(
@@ -488,11 +539,11 @@ if len(st.session_state.messages) > 0:
                         if chart_config:
                             tbl_col, chart_col = st.columns([1, 1.4], gap="medium")
                             with tbl_col:
-                                st.dataframe(df_display, use_container_width=True)
+                                st.dataframe(df_display, width="stretch")
                             with chart_col:
                                 render_chart(df_display, chart_config)
                         else:
-                            st.dataframe(df_display, use_container_width=True)
+                            st.dataframe(df_display, width="stretch")
                         
                         # Add to session state
                         st.session_state.messages.append({
@@ -511,3 +562,4 @@ if len(st.session_state.messages) > 0:
 
     # Reset temp prompt if used
     st.session_state.temp_prompt = None
+
