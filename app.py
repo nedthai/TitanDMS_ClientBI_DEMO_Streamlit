@@ -11,7 +11,7 @@ load_dotenv()
 
 # Page Configuration
 st.set_page_config(
-    page_title="Dealer AI Assistant",
+    page_title="Dealer AI Assistant - Chatbot",
     page_icon="🤖",
     layout="wide",
     initial_sidebar_state="collapsed"
@@ -370,19 +370,18 @@ def extract_chart_preference(question: str) -> str:
 # Main Layout Logic
 # Minimalist Sidebar Design
 with st.sidebar:
-    # 0. Sidebar Branding (Conditional)
-    if len(st.session_state.messages) == 0:
-        _, sb_logo_col, _ = st.columns([1, 1.5, 1])
-        with sb_logo_col:
-            st.image("assets/logo.png", width=80)
-        
-        st.markdown("""
-            <div style='text-align: center; margin-top: -15px; margin-bottom: 20px;'>
-                <span style='background: linear-gradient(90deg, #4f46e5, #ec4899); -webkit-background-clip: text; -webkit-text-fill-color: transparent; font-weight: 700; font-size: 1.1rem;'>
-                    Dealer AI Assistant
-                </span>
-            </div>
-        """, unsafe_allow_html=True)
+    # 0. Sidebar Branding (Always Visible)
+    _, sb_logo_col, _ = st.columns([1, 1.5, 1])
+    with sb_logo_col:
+        st.image("assets/logo.png", width=80)
+    
+    st.markdown("""
+        <div style='text-align: center; margin-top: -15px; margin-bottom: 20px;'>
+            <span style='background: linear-gradient(90deg, #4f46e5, #ec4899); -webkit-background-clip: text; -webkit-text-fill-color: transparent; font-weight: 700; font-size: 1.1rem;'>
+                Dealer AI Assistant
+            </span>
+        </div>
+    """, unsafe_allow_html=True)
     
     # 1. System Status Section
     st.markdown("<div class='sidebar-header'>SYSTEM STATUS</div>", unsafe_allow_html=True)
@@ -435,17 +434,18 @@ user_input = st.chat_input("How can I help you today?")
 if user_input:
     st.session_state.messages.append({"role": "user", "content": user_input})
 
-# Header Section (Always Visible)
-st.markdown("<div style='height: 2vh;'></div>", unsafe_allow_html=True)
-_, logo_col, _ = st.columns([2, 0.4, 2])
-with logo_col:
-    st.image("assets/logo.png", width=120)
+# Header Section (Conditional)
+if len(st.session_state.messages) == 0:
+    st.markdown("<div style='height: 2vh;'></div>", unsafe_allow_html=True)
+    _, logo_col, _ = st.columns([2, 0.4, 2])
+    with logo_col:
+        st.image("assets/logo.png", width=120)
 
-st.markdown("<div class='welcome-text'>Hi there,</div>", unsafe_allow_html=True)
-st.markdown("<div class='gradient-title' style='font-size: 2.2rem;'>Let's get insight into your data with an AI assistant!</div>", unsafe_allow_html=True)
+    st.markdown("<div class='welcome-text'>Hi there,</div>", unsafe_allow_html=True)
+    st.markdown("<div class='gradient-title' style='font-size: 2.2rem;'>Let's get insight into your data with an AI assistant!</div>", unsafe_allow_html=True)
 
-# User Guide Navigation (Moved to Sidebar)
-st.markdown("<div style='height: 2vh;'></div>", unsafe_allow_html=True)
+    # Padding
+    st.markdown("<div style='height: 2vh;'></div>", unsafe_allow_html=True)
 
 
 # Display Chat History Loop
