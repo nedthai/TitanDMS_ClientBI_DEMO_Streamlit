@@ -270,6 +270,17 @@ with col_chat:
                         st.markdown(message["content"])
 
     user_input = st.chat_input("How can I help you today?")
+    
+    # --- ASSISTANT ACTIONS (Bottom Right of Chat Pane) ---
+    action_spacer, col_guide, col_clear = st.columns([8.5, 1, 1], vertical_alignment="center")
+    with col_guide:
+        if st.button(" ", icon=":material/menu_book:", help="Go to User Guide", type="tertiary", use_container_width=True):
+            st.switch_page("pages/User_Guide.py")
+    with col_clear:
+        if st.button(" ", icon=":material/delete:", help="Clear chat history", type="tertiary", use_container_width=True):
+            st.session_state.messages = []
+            st.rerun()
+
     if user_input:
         st.session_state.messages.append({"role": "user", "content": user_input})
         
