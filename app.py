@@ -378,12 +378,29 @@ with col_canvas:
                     st.info("No chart configuration was generated for this query.")
 
         else:
-            import plotly.express as px
-            import plotly.graph_objects as go
+            # ── 1. SAMPLE DATA FOR WELCOME STATE ──────────────────────────
+            months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
+            sample_df = pd.DataFrame({
+                "Month": months,
+                "Brand": ["Toyota"] * 12,
+                "Units Sold": [42, 55, 48, 70, 66, 80, 75, 90, 85, 110, 102, 120],
+                "Revenue": [126000, 165000, 144000, 210000, 198000, 240000, 225000, 270000, 255000, 330000, 306000, 360000]
+            })
+            
+            sample_chart_config = {
+                "CHART_TYPE": "line",
+                "X_AXIS": "Month",
+                "Y_AXIS": "Units Sold",
+                "COLOR": "Brand"
+            }
 
-            # ── RICH EMPTY STATE: Showcase Dashboard ──────────────────────────
-            st.markdown("""
-                <div style='text-align:center; margin-bottom: 0.5rem;'>
+            # ── 2. KPI SUMMARY CARD (Sample) ──────────────────────────────────
+            total_revenue = sample_df["Revenue"].sum()
+            metric_fmt = f"${total_revenue / 1_000_000:,.1f}M"
+            sub_text = "Total illustrative revenue for the current year"
+
+            st.markdown(f"""
+                <div style='text-align:center; margin-bottom: 1.5rem;'>
                     <h2 style='color:#1e293b; font-size:1.6rem; font-weight:700; margin-bottom:4px;'>
                         📊 Your Analytics Workspace
                     </h2>
@@ -393,58 +410,27 @@ with col_canvas:
                 </div>
             """, unsafe_allow_html=True)
 
-            PALETTE = ["#4f46e5", "#7c3aed", "#ec4899", "#f59e0b", "#10b981", "#06b6d4"]
-            _layout = dict(
-                height=420,
-                margin=dict(l=10, r=10, t=50, b=20),
-                paper_bgcolor="rgba(0,0,0,0)",
-                plot_bgcolor="rgba(248,250,252,0.4)",
-                font=dict(color="#334155", family="'Rubik', sans-serif", size=12),
-                title_font=dict(size=16, color="#0f172a", family="'Rubik', sans-serif"),
-                legend=dict(orientation="h", yanchor="top", y=-0.05, xanchor="center", x=0.5, font_size=11),
-            )
+            st.markdown(f"""
+                <div class="canvas-kpi-card">
+                    <div class="canvas-kpi-icon">💰</div>
+                    <div>
+                        <div class="canvas-kpi-label">TOTAL REvenue (Sample)</div>
+                        <div class="canvas-kpi-value">{metric_fmt}</div>
+                        <div class="canvas-kpi-sub">{sub_text}</div>
+                    </div>
+                </div>
+            """, unsafe_allow_html=True)
 
-            st.markdown("<div style='height: 2rem;'></div>", unsafe_allow_html=True)
-            
-            # ── Row 1: Line Trend + Donut ──────────────────────────────────────
-            r1c1, r1c2 = st.columns([3, 2], gap="large")
+            # ── 3. TABLE (left) + CHART (right) ─────────────────────────────────
+            col_table, col_chart = st.columns([1, 1], gap="medium")
 
-            with r1c1:
-                months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun",
-                          "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
-                trend_df = pd.DataFrame({
-                    "Month": months * 2,
-                    "Units Sold": [42,55,48,70,66,80,75,90,85,110,102,120,
-                                   30,38,35,50,48,62,58,72,68,88,82,95],
-                    "Brand": ["Toyota"]*12 + ["Honda"]*12,
-                })
-                fig_line = px.line(
-                    trend_df, x="Month", y="Units Sold", color="Brand",
-                    markers=True, title="Monthly Sales Trend",
-                    color_discrete_sequence=PALETTE,
-                )
-                fig_line.update_traces(line_width=3, marker=dict(size=8, line=dict(width=2, color="white")))
-                fig_line.update_layout(**_layout)
-                # Override legend for line chart to be at the top (to avoid overlap with X-axis)
-                fig_line.update_layout(legend=dict(yanchor="bottom", y=1.02, xanchor="right", x=1))
-                st.plotly_chart(fig_line, width="stretch", key="es_line")
+            with col_table:
+                st.markdown("<div class='canvas-section-title'>📋 Detail Data</div>", unsafe_allow_html=True)
+                st.dataframe(sample_df, width="stretch", height=380)
 
-            with r1c2:
-                seg_df = pd.DataFrame({
-                    "Segment": ["SUV", "Sedan", "Truck", "Hatchback", "Van"],
-                    "Share": [38, 26, 18, 12, 6],
-                })
-                fig_donut = px.pie(
-                    seg_df, names="Segment", values="Share",
-                    hole=0.55, title="Vehicle Segment Mix",
-                    color_discrete_sequence=PALETTE,
-                )
-                fig_donut.update_traces(
-                    textposition="inside", textinfo="percent+label",
-                    insidetextorientation="radial",
-                    marker=dict(line=dict(color="#ffffff", width=2.5))
-                )
-                fig_donut.update_layout(**_layout)
-                st.plotly_chart(fig_donut, width="stretch", key="es_donut")
+            with col_chart:
+                st.markdown("<div class='canvas-section-title'>📈 Chart Visualization</div>", unsafe_allow_html=True)
+                render_chart(sample_df, sample_chart_config)
+
 
     render_canvas_fragment()

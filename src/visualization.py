@@ -210,11 +210,11 @@ def render_chart(df: pd.DataFrame, chart_config: dict):
 
     fig.update_layout(
         height=380,
-        margin=dict(l=20, r=20, t=40, b=60),
+        margin=dict(l=20, r=20, t=50, b=40),
         paper_bgcolor="rgba(0,0,0,0)",
         plot_bgcolor="rgba(0,0,0,0)",
         font=dict(color="#212529", family="'Rubik', sans-serif"),
-        legend=dict(orientation="h", yanchor="top", y=-0.12,
+        legend=dict(orientation="h", yanchor="bottom", y=1.02,
                     xanchor="center", x=0.5),
     )
     st.plotly_chart(fig, width="stretch")
