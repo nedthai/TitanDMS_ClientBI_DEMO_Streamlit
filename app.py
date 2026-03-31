@@ -8,13 +8,12 @@ from src.visualization import render_chart, parse_chart_config
 
 load_dotenv()
 
-
 # Page Configuration
 st.set_page_config(
     page_title="Dealer AI Assistant - Chatbot",
     page_icon="🤖",
     layout="wide",
-    initial_sidebar_state="collapsed"
+    initial_sidebar_state="expanded"
 )
 
 # Initialize Session State
@@ -23,8 +22,14 @@ if "messages" not in st.session_state:
 if "temp_prompt" not in st.session_state:
     st.session_state.temp_prompt = None
 
-# Custom CSS for Premium Experience
+# --- SESSION STATE INITIALIZATION FOR DUAL-PANE ---
+if "current_df" not in st.session_state: st.session_state.current_df = None
+if "current_chart_config" not in st.session_state: st.session_state.current_chart_config = None
+if "current_sql" not in st.session_state: st.session_state.current_sql = None
+if "current_text" not in st.session_state: st.session_state.current_text = None
+if "current_question" not in st.session_state: st.session_state.current_question = None
 
+# Custom CSS for Premium Experience (White Background)
 st.markdown("""
     <style>
     @import url('https://fonts.googleapis.com/css2?family=Rubik:wght@300;400;500;600;700&display=swap');
@@ -33,533 +38,413 @@ st.markdown("""
         font-family: 'Rubik', sans-serif !important;
     }
 
-    /* Centering results and unifying widths */
-    .main .block-container {
-        max-width: 850px !important;
-        margin: 0 auto !important;
-        padding-top: 3rem !important;
-    }
-    
-    /* Ensure the input field matches the content width */
-    [data-testid="stBottom"] > div {
-        max-width: 850px !important;
-        margin: 0 auto !important;
-    }
-
-    /* Vibrant Blurred Background - Lighter Pastel Mix */
-    /* Minimalist White Background */
     .stApp {
         background-color: #ffffff;
-        background-image: 
-            radial-gradient(at 85% 0%, rgba(240, 244, 255, 0.6) 0px, transparent 40%),
-            radial-gradient(at 0% 100%, rgba(245, 240, 255, 0.4) 0px, transparent 40%);
-        background-attachment: fixed;
     }
 
-    /* Main Container Cleanup */
-    [data-testid="stVerticalBlock"] > div:has(div > .stHeader) {
-        background: transparent;
-        border: none;
-        padding: 0 !important;
-        box-shadow: none;
-        backdrop-filter: none;
+    /* Dual-Pane Column Styling */
+    [data-testid="column"]:nth-of-type(1) {
+        border-right: 1px solid #f1f5f9;
+        padding-right: 2rem !important;
+        display: flex;
+        flex-direction: column;
+        justify-content: flex-end;
+        min-height: 85vh;
+        padding-bottom: 1rem !important;
     }
+    
+    /* Highlighted Canvas Border for Right Column */
+    [data-testid="column"]:nth-of-type(2) {
+        padding: 2.5rem !important;
+        background-color: #ffffff;
+        border: 2px solid #4f46e5; /* Highlighted indigo border */
+        border-radius: 24px;
+        box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.05);
+        min-height: 85vh;
+        margin-left: 1rem !important;
+    }
+
+    /* Hide the default Streamlit sidebar navigation */
+    [data-testid="stSidebarNav"] {
+        display: none !important;
+    }
+
 
     /* Gradient Title */
     .gradient-title {
         background: linear-gradient(90deg, #4f46e5, #ec4899);
         -webkit-background-clip: text;
         -webkit-text-fill-color: transparent;
-        font-size: 2.8rem;
+        font-size: 2.2rem;
         font-weight: 700;
         text-align: center;
-        margin-top: 0px;
-        margin-bottom: 15px; /* Reduced from 30px */
+        margin-bottom: 20px;
     }
     
     .welcome-text {
-        font-size: 1.8rem;
-        font-weight: 600;
-        color: #0f172a;
-        text-align: center;
-        margin-top: -10px;    /* Pulled closer to logo */
-        margin-bottom: -12px; /* Slightly more space for title */
-    }
-
-    /* Card Styling for Quick Actions */
-    .action-card {
-        background: rgba(255, 255, 255, 0.8);
-        border: 1px solid #f1f5f9;
-        border-radius: 16px;
-        padding: 20px;
-        margin-bottom: 15px;
-        box-shadow: 0 4px 6px rgba(0,0,0,0.02);
-        transition: all 0.2s ease;
-    }
-    .action-card:hover {
-        background: #ffffff;
-        box-shadow: 0 10px 25px rgba(0,0,0,0.06);
-        transform: translateY(-2px);
-    }
-    
-    .card-title {
-        font-weight: 600;
-        color: #0f172a;
-        margin-bottom: 6px;
-        font-size: 1rem;
-    }
-    .card-desc {
-        font-size: 0.85rem;
+        font-size: 1.2rem;
+        font-weight: 500;
         color: #64748b;
+        text-align: center;
+        margin-top: -10px;
+        margin-bottom: 20px;
     }
 
     /* Chat Message Bubbles */
     [data-testid="stChatMessage"] {
         background-color: transparent !important;
-        margin-bottom: -30px !important;
-        width: 100% !important;
-        padding-right: 0px !important;
     }
 
-    /* Target the content area within the chat message for bubble styling */
     [data-testid="stChatMessageContent"] {
-        padding: 0.3rem 0.6rem !important;
-        border-radius: 10px !important;
-        box-shadow: 0 4px 12px rgba(0,0,0,0.03) !important;
-        width: 100% !important;
-        box-sizing: border-box !important;
-        padding-top: 10px !important;
-        padding-bottom: 10px !important;
+        border-radius: 12px !important;
+        padding: 1rem !important;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.05) !important;
     }
 
-    /* Chat Content Styling (Force no borders/shadows) */
-    [data-testid="stChatMessageContent"],
-    [data-testid="stStatusWidget"],
-    [data-testid="stStatusWidget"] > div {
-        border: 1px solid transparent !important;
-        box-shadow: none !important;
-    }
-
-    /* User Message Bubble */
     [data-testid="stChatMessage"]:nth-child(odd) [data-testid="stChatMessageContent"] {
-        background-color: #f8fafc !important;
-        color: #0f172a !important;
+        background-color: #f1f5f9 !important;
+        color: #1e293b !important;
     }
     
-    /* AI Message Bubble */
     [data-testid="stChatMessage"]:nth-child(even) [data-testid="stChatMessageContent"] {
         background-color: #ffffff !important;
+        border: 1px solid #e2e8f0 !important;
         color: #1e293b !important;
     }
 
-    /* Additional status widget cleanup */
-    [data-testid="stStatusWidget"] {
-        background-color: transparent !important;
-    }
-
-    /* Input Field Styling */
-    [data-testid="stChatInput"] {
-        border-radius: 12px !important;
-        border: none !important;
-        background: #ffffff !important;
-        box-shadow: 0 8px 30px rgba(0,0,0,0.04) !important;
-        padding: 0 !important;
-    }
-    
-    [data-testid="stChatInput"] textarea {
-        padding: 0.15rem 0.3rem !important; /* Ultra-compact (1/3 size) */
-        min-height: unset !important;
-    }
-
-    /* Sidebar Section Headers (Enlarged & Refined) */
+    /* Sidebar Section Headers */
     .sidebar-header {
-        font-size: 0.85rem; /* Increased as requested */
+        font-size: 0.85rem;
         text-transform: uppercase;
         color: #94a3b8;
-        font-weight: 700;   /* Slightly bolder for prominence */
+        font-weight: 700;
         letter-spacing: 1.2px;
-        margin-bottom: 6px; /* Reduced from 12px as requested */
-        margin-top: 18px;
+        margin-bottom: 12px;
+        margin-top: 20px;
     }
 
-    /* Elegant Sidebar Menu Item (for Clear Chat) */
-    .sidebar-action-item {
+    /* ── Canvas KPI Card ─────────────────────────────── */
+    .canvas-kpi-card {
+        background: linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%);
+        border-radius: 16px;
+        padding: 1.4rem 2rem;
+        margin-bottom: 1.5rem;
         display: flex;
         align-items: center;
-        padding: 10px 12px;
-        border-radius: 10px;
-        color: #475569;
-        font-size: 0.88rem;
-        font-weight: 500;
-        cursor: pointer;
-        transition: all 0.2s ease;
-        text-decoration: none;
-        margin-left: -5px;
+        gap: 1.5rem;
+        box-shadow: 0 8px 24px rgba(79, 70, 229, 0.25);
     }
-    .sidebar-action-item:hover {
-        background-color: #f1f5f9;
-        color: #0f172a;
-        transform: translateX(3px);
+    .canvas-kpi-icon {
+        font-size: 2.4rem;
+        line-height: 1;
     }
-    .sidebar-action-icon {
-        margin-right: 12px;
-        font-size: 1rem;
-        opacity: 0.8;
+    .canvas-kpi-label {
+        color: rgba(255,255,255,0.75);
+        font-size: 0.82rem;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 1.1px;
+        margin-bottom: 2px;
     }
-
-    /* Hide the default Streamlit Multipage Navigation */
-    [data-testid="stSidebarNav"] {
-        display: none !important;
+    .canvas-kpi-value {
+        color: #ffffff;
+        font-size: 2rem;
+        font-weight: 700;
+        line-height: 1.1;
     }
-    
-    /* Refined Sidebar Menu Item (Narrower, Left Aligned) */
-
-    section[data-testid="stSidebar"] .stButton>button {
-        background: none !important;
-        background-color: transparent !important;
-        color: #475569 !important;
-        border-radius: 8px !important;
-        border: none !important;
-        outline: none !important;
-        padding: 0.4rem 0.6rem !important; /* Reduced height/padding */
-        font-weight: 500 !important;
-        font-size: 0.85rem !important;
-        box-shadow: none !important;
-        display: flex !important;
-        justify-content: flex-start !important;
-        transition: all 0.2s ease !important;
-        width: fit-content !important; /* Narrower width */
-        min-width: 160px !important;
-        text-align: left !important;
+    .canvas-kpi-sub {
+        color: rgba(255,255,255,0.6);
+        font-size: 0.78rem;
+        margin-top: 3px;
     }
-    section[data-testid="stSidebar"] .stButton>button:hover {
-        background-color: #f1f5f9 !important;
-        color: #0f172a !important;
-        transform: translateX(3px) !important;
-    }
-    
-    /* Main Area Buttons (Quick Insights) - More Refined Card Style */
-    .stButton {
-        margin-top: -12px !important; /* Pull buttons closer together */
-    }
-    .stButton>button {
-        background-color: #ffffff !important;
-        color: #0f172a !important;
-        border-radius: 12px !important;
-        border: 1px solid #f1f5f9 !important;
-        font-weight: 500 !important;
-        font-size: 0.85rem !important;  /* Slightly smaller for refinement */
-        padding: 0.4rem 0.8rem !important; /* Balanced padding */
-        box-shadow: 0 4px 6px rgba(0,0,0,0.01) !important;
-        text-align: center !important;  /* Center the text within the button */
-        transition: all 0.2s ease !important;
-        margin: 0 auto !important;
-    }
-    .stButton>button:hover {
-        background-color: #ffffff !important;
-        border-color: #4f46e5 !important;
-        box-shadow: 0 10px 25px rgba(0,0,0,0.06) !important;
-        transform: translateY(-2px);
-    }
-
-    /* Dashed Insight Box - override Streamlit's bordered container inner border */
-    [data-testid="stChatMessage"] [data-testid="stVerticalBlockBorderWrapper"] > div {
-        border: 1.8px dashed #a5b4fc !important;
-        border-radius: 10px !important;
-        background: rgba(238, 242, 255, 0.42) !important;
-        padding: 5px 16px !important;
-    }
-
-    /* Sidebar Navigation Link (Mimic Sidebar Buttons) */
-    .sidebar-nav-link {
-        color: #475569 !important;
-        text-decoration: none !important;
-        padding: 0.45rem 0.6rem !important; /* Refined to match button padding */
-        font-weight: 500 !important;
-        font-size: 0.85rem !important;
-        display: flex !important;
-        align-items: center !important;
-        transition: all 0.2s ease !important;
-        width: fit-content !important;
-        min-width: 160px !important;
-        border-radius: 8px !important;
-        font-family: 'Rubik', sans-serif !important;
-        line-height: 1.25 !important;
-    }
-    .sidebar-nav-link:hover {
-        background-color: #f1f5f9 !important;
-        color: #0f172a !important;
-        transform: translateX(3px) !important;
-    }
-    .sidebar-nav-link span {
-        margin-right: 12px;
-        font-size: 1rem;
-        display: inline-flex;
-        align-items: center;
-        justify-content: center;
-        width: 18px; /* Consistent icon width */
+    /* ── Canvas Section Header ───────────────────────── */
+    .canvas-section-title {
+        font-size: 0.78rem;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 1.1px;
+        color: #94a3b8;
+        margin-bottom: 8px;
+        padding-bottom: 6px;
+        border-bottom: 1px solid #e2e8f0;
     }
     </style>
     """, unsafe_allow_html=True)
 
-
-
-# Column Display Mapping (Overwrites for special cases)
+# Column Display Mapping
 COLUMN_DISPLAY_MAP = {
-    "Stock_No": "Stock #",
-    "Deal_No": "Deal #",
-    "Invoice_No": "Invoice #",
-    "Is_Current_Month": "Current Month?",
-    "Is_Current_Year": "Current Year?",
-    "Trade_In_Income": "Trade-In Profit",
-    "Date_In_Stock": "History Date",
-    "Stock_Value": "Value",
-    "Days_In_Stock": "Days Aged"
+    "Stock_No": "Stock #", "Deal_No": "Deal #", "Invoice_No": "Invoice #",
+    "Is_Current_Month": "Current Month?", "Is_Current_Year": "Current Year?",
+    "Trade_In_Income": "Trade-In Profit", "Date_In_Stock": "History Date",
+    "Stock_Value": "Value", "Days_In_Stock": "Days Aged"
 }
 
 def clean_column_names(df):
-    """Renames DataFrame columns to be more user-friendly."""
-    new_columns = {}
-    for col in df.columns:
-        new_columns[col] = get_friendly_name(col)
+    new_columns = {col: get_friendly_name(col) for col in df.columns}
     return df.rename(columns=new_columns)
 
 def get_friendly_name(col):
-    """Converts a technical column name to a friendly display name."""
-    if col in COLUMN_DISPLAY_MAP:
-        return COLUMN_DISPLAY_MAP[col]
-    
-    # Automated cleaning logic
-    clean_name = col.replace("_", " ")
-    clean_name = clean_name.replace(" Name", "")
-    clean_name = clean_name.replace(" Description", "")
-    clean_name = clean_name.replace(" Invoice", " Sold")
-    clean_name = clean_name.replace("Invoice ", "Sold ")
-    return clean_name.strip()
+    if col in COLUMN_DISPLAY_MAP: return COLUMN_DISPLAY_MAP[col]
+    return col.replace("_", " ").strip()
 
-# ── Chart Preference Extraction ──────────────────────────────────────────────
-# Keep this in sync with CHART_TYPE_ALIASES in visualization.py
-_CHART_KEYWORDS = [
-    "stacked column", "stacked bar", "stacked area",
-    "horizontal bar", "grouped bar", "grouped column",
-    "column chart", "column graph",
-    "bar chart", "bar graph",
-    "line chart", "line graph",
-    "pie chart",
-    "donut chart", "doughnut chart",
-    "area chart",
-    "scatter chart", "scatter plot",
-    "histogram",
-    "box chart", "box plot",
-    "violin chart", "violin plot",
-    "treemap", "tree map",
-    "funnel chart",
-    # Single-word fallbacks (order matters — longer phrases above)
-    "column", "bar", "line", "pie", "donut", "doughnut",
-    "area", "scatter", "box", "violin", "funnel",
-]
+_CHART_KEYWORDS = ["stacked column", "stacked bar", "stacked area", "horizontal bar", "grouped bar", "grouped column", "column chart", "column graph", "bar chart", "bar graph", "line chart", "line graph", "pie chart", "donut chart", "doughnut chart", "area chart", "scatter chart", "scatter plot", "histogram", "box chart", "box plot", "violin chart", "violin plot", "treemap", "tree map", "funnel chart", "column", "bar", "line", "pie", "donut", "doughnut", "area", "scatter", "box", "violin", "funnel"]
 
 def extract_chart_preference(question: str) -> str:
-    """Return the chart type phrase if the user mentioned one, else 'Not specified'."""
     q = question.lower()
     for kw in _CHART_KEYWORDS:
-        if kw in q:
-            return kw
+        if kw in q: return kw
     return "Not specified"
 
-# Main Layout Logic
-# Minimalist Sidebar Design
+def get_cached_dictionary():
+    with open("data/Database_Dictionary.md", "r") as f: return f.read()
+
+# Sidebar
 with st.sidebar:
-    # 0. Sidebar Branding (Always Visible)
-    _, sb_logo_col, _ = st.columns([1, 1.5, 1])
-    with sb_logo_col:
-        st.image("assets/logo.png", width=80)
+    # 1. Centered Logo using Base64 for consistent alignment
+    import base64
+    with open("assets/logo.png", "rb") as f:
+        sb_logo_base64 = base64.b64encode(f.read()).decode()
     
-    st.markdown("""
-        <div style='text-align: center; margin-top: -15px; margin-bottom: 20px;'>
-            <span style='background: linear-gradient(90deg, #4f46e5, #ec4899); -webkit-background-clip: text; -webkit-text-fill-color: transparent; font-weight: 700; font-size: 1.1rem;'>
+    st.markdown(f"""
+        <div style='display: flex; justify-content: center; margin-top: 10px; margin-bottom: 5px;'>
+            <img src='data:image/png;base64,{sb_logo_base64}' width='80'>
+        </div>
+        <div style='text-align: center; margin-bottom: 25px;'>
+            <span style='background: linear-gradient(90deg, #4f46e5, #ec4899); -webkit-background-clip: text; -webkit-text-fill-color: transparent; font-weight: 700; font-size: 1.2rem; font-family: "Rubik", sans-serif;'>
                 Dealer AI Assistant
             </span>
         </div>
     """, unsafe_allow_html=True)
     
-    # 1. System Status Section
+    # 2. System Status Section
     st.markdown("<div class='sidebar-header'>SYSTEM STATUS</div>", unsafe_allow_html=True)
-    
     db_exists = os.path.exists("data/Database_Data.duckdb")
     api_key_exists = os.getenv("GEMINI_API_KEY") is not None
     
-    st.markdown(f"<div class='status-row'>&nbsp;&nbsp;{'🟢' if db_exists else '🔴'} <span style='margin-left: 8px;'>Database Status: {'Active' if db_exists else 'Failed'}</span></div>", unsafe_allow_html=True)
-    st.markdown(f"<div class='status-row'>&nbsp;&nbsp;{'🟢' if api_key_exists else '🔴'} <span style='margin-left: 8px;'>LLM Model: {'Google Gemini' if api_key_exists else 'Failed'}</span></div>", unsafe_allow_html=True)
-
-    st.markdown("<div style='height: 15px;'></div>", unsafe_allow_html=True)
+    status_db = "Active" if db_exists else "Failed"
+    status_api = "Google Gemini" if api_key_exists else "Failed"
     
-    # 2. Dealer Information Section
-    st.markdown("<div class='sidebar-header'>DEALER INFORMATION</div>", unsafe_allow_html=True)
-    # Intentionally blank for future use
-    
-    st.markdown("<div style='height: 15px;'></div>", unsafe_allow_html=True)
-    
-    # 3. Assistant Actions Section
-    st.markdown("<div class='sidebar-header'>ASSISTANT ACTIONS</div>", unsafe_allow_html=True)
-    
-    # User Guide Link (With consistent icon container)
-    st.markdown("""
-        <a href="/User_Guide" target="_blank" class="sidebar-nav-link" style="margin-left: 2px; margin-top: -5px;">
-            <span>📖</span>User Guide
-        </a>
-        <div style="height: 4px;"></div>
+    st.markdown(f"""
+        <div style='margin-left: 5px; font-size: 0.9rem; color: #475569;'>
+            <p style='margin-bottom: 5px;'>🟢 <span style='margin-left: 8px;'>Database Status: {status_db}</span></p>
+            <p>🟢 <span style='margin-left: 8px;'>LLM Model: {status_api}</span></p>
+        </div>
     """, unsafe_allow_html=True)
 
-
-    # Left-aligned, narrow action link
-    if st.button("🗑️&nbsp;&nbsp;Clear chat history", key="trigger_clear", help=None, use_container_width=False):
-        st.session_state.messages = []
-        st.session_state.temp_prompt = None
-        st.rerun()
-
-
-def get_cached_dictionary():
-    with open("data/Database_Dictionary.md", "r") as f:
-        return f.read()
-
-if st.session_state.temp_prompt:
-    st.session_state.messages.append({"role": "user", "content": st.session_state.temp_prompt})
-    st.session_state.temp_prompt = None
-
-# The Streamlit `st.chat_input` doesn't block, so it's placed anywhere but renders at bottom.
-user_input = st.chat_input("How can I help you today?")
+    st.markdown("<div style='height: 15px;'></div>", unsafe_allow_html=True)
+    
+    # 3. Dealer Information Section
+    st.markdown("<div class='sidebar-header'>DEALER INFORMATION</div>", unsafe_allow_html=True)
+    # Placeholder for dealer info as in original
+    st.markdown("<div style='height: 15px;'></div>", unsafe_allow_html=True)
 
 
-if user_input:
-    st.session_state.messages.append({"role": "user", "content": user_input})
+# --- MAIN RENDER LOGIC ---
+col_chat, col_canvas = st.columns([1, 2], gap="medium")
 
-# Header Section (Conditional)
-if len(st.session_state.messages) == 0:
-    st.markdown("<div style='height: 2vh;'></div>", unsafe_allow_html=True)
-    _, logo_col, _ = st.columns([2, 0.4, 2])
-    with logo_col:
-        st.image("assets/logo.png", width=120)
-
-    st.markdown("<div class='welcome-text'>Hi there,</div>", unsafe_allow_html=True)
-    st.markdown("<div class='gradient-title' style='font-size: 2.2rem;'>Let's get insight into your data with an AI assistant!</div>", unsafe_allow_html=True)
-
-    # Padding
-    st.markdown("<div style='height: 2vh;'></div>", unsafe_allow_html=True)
-
-
-# Display Chat History Loop
-last_message_is_user = False
-if len(st.session_state.messages) > 0:
-    for i, message in enumerate(st.session_state.messages):
-        with st.chat_message(message["role"]):
-            if "sql" in message:
-                with st.expander("🔍 View Generated SQL Query", expanded=False):
-                    st.code(message["sql"], language="sql")
-            if message["content"]:
-                with st.container(border=True):
-                    st.markdown(message["content"])
-            if "df" in message:
-                has_chart = bool(message.get("chart_config"))
-                if has_chart:
-                    tbl_col, chart_col = st.columns([1, 1.4], gap="medium")
-                    with tbl_col:
-                        st.dataframe(
-                            clean_column_names(message["df"].copy()),
-                            width="stretch"
-                        )
-                    with chart_col:
-                        render_chart(
-                            clean_column_names(message["df"].copy()),
-                            message["chart_config"]
-                        )
-                else:
-                    st.dataframe(
-                        clean_column_names(message["df"].copy()),
-                        use_container_width=True
-                    )
+# Left Pane: Control (Chat)
+with col_chat:
+    if len(st.session_state.messages) == 0:
+        # Perfectly Center Logo using Base64/HTML for alignment
+        import base64
+        with open("assets/logo.png", "rb") as f:
+            logo_base64 = base64.b64encode(f.read()).decode()
         
-        # Check if this is the last message and it's from the user
-        if i == len(st.session_state.messages) - 1 and message["role"] == "user":
-            last_message_is_user = True
+        st.markdown(f"""
+            <div style='display: flex; justify-content: center; margin-bottom: 10px;'>
+                <img src='data:image/png;base64,{logo_base64}' width='100'>
+            </div>
+        """, unsafe_allow_html=True)
+            
+        st.markdown("<div class='welcome-text' style='margin-bottom: -15px;'>Hi there,</div>", unsafe_allow_html=True)
+        st.markdown("<div class='gradient-title'>Let's get insights into your data!</div>", unsafe_allow_html=True)
+    else:
+        chat_container = st.container(height=650, border=False)
+        with chat_container:
+            for i, message in enumerate(st.session_state.messages):
+                with st.chat_message(message["role"]):
+                    if "sql" in message and message["sql"]:
+                        with st.expander("🔍 SQL Query", expanded=False):
+                            st.code(message["sql"], language="sql")
+                    if message.get("content"):
+                        st.markdown(message["content"])
 
-    # Process AI Response if the last message was from the user
-    if last_message_is_user:
-        user_msg = st.session_state.messages[-1]["content"]
+    user_input = st.chat_input("How can I help you today?")
+    if user_input:
+        st.session_state.messages.append({"role": "user", "content": user_input})
+        
+        # Process AI Response
         with st.chat_message("assistant"):
             with st.status("Analyzing Data...", expanded=True) as status:
                 try:
-                    # 1. Read Data Dictionary
                     data_dict = get_cached_dictionary()
-
-                    # 2. Generate SQL
-                    status.write("Generating SQL query...")
-                    sql = generate_sql(user_msg, data_dict)
-                    with st.expander("🔍 View Generated SQL Query", expanded=False):
-                        st.code(sql, language="sql")
-
-                    # 3. Execute Query
-                    status.write("Executing query on DuckDB...")
+                    sql = generate_sql(user_input, data_dict)
                     df = execute_query(sql)
                     
                     if df.empty:
                         response_text = "I couldn't find any data for that request."
-                        with st.container(border=True):
-                            st.markdown(response_text)
-                        # Add to session state
+                        st.markdown(response_text)
                         st.session_state.messages.append({"role": "assistant", "content": response_text})
                     else:
-                        # Apply User-Friendly Renaming
                         df_display = clean_column_names(df.copy())
-                        
-                        status.write("Interpreting results...")
-                        # 4. Interpret Results
-                        data_summary = df.head(20).to_string()
-                        chart_pref = extract_chart_preference(user_msg)
-                        response_text = interpret_results(user_msg, data_summary,
-                                                          user_chart_preference=chart_pref)
-                        
-                        # 5. Parse Chart Config
+                        chart_pref = extract_chart_preference(user_input)
+                        response_text = interpret_results(user_input, df_display.head(20).to_string(), user_chart_preference=chart_pref)
                         chart_config = parse_chart_config(response_text)
-                        
-                        # Clean the response text (strip chart config block)
                         clean_response = response_text.split("---")[0].strip()
 
-                        # 6. Display Insight Box (Summarize & Highlight)
-                        with st.container(border=True):
-                            st.markdown(clean_response)
+                        st.markdown(clean_response)
                         
-                        # 7. Remap chart axis labels to friendly names
-                        if chart_config:
-                            for key in ["X_AXIS", "Y_AXIS", "COLOR"]:
-                                if key in chart_config and chart_config[key] in df.columns:
-                                    chart_config[key] = get_friendly_name(chart_config[key])
-
-                        # 8. Display Table and Chart side-by-side
-                        if chart_config:
-                            tbl_col, chart_col = st.columns([1, 1.4], gap="medium")
-                            with tbl_col:
-                                st.dataframe(df_display, width="stretch")
-                            with chart_col:
-                                render_chart(df_display, chart_config)
-                        else:
-                            st.dataframe(df_display, width="stretch")
-                        
-                        # Add to session state
+                        st.session_state.current_df = df_display
+                        st.session_state.current_chart_config = chart_config
+                        st.session_state.current_question = user_input
                         st.session_state.messages.append({
                             "role": "assistant",
                             "content": clean_response,
                             "sql": sql,
-                            "df": df,
-                            "chart_config": chart_config
                         })
-                    
                     status.update(label="Complete!", state="complete", expanded=False)
+                    st.rerun()
                 except Exception as e:
                     st.error(f"Error: {e}")
                     status.update(label="Error Occurred", state="error")
-                    st.session_state.messages.append({"role": "assistant", "content": "I encountered an error processing your request."})
 
-    # Reset temp prompt if used
-    st.session_state.temp_prompt = None
+# Right Pane: Canvas
+with col_canvas:
+    @st.fragment
+    def render_canvas_fragment():
+        if st.session_state.current_df is not None:
+            df = st.session_state.current_df
+            chart_config = st.session_state.current_chart_config
+            question = st.session_state.get("current_question", "")
 
+            # ── 1. KPI SUMMARY CARD ─────────────────────────────────────────────
+            # Determine numeric metric column (prefer Y_AXIS from chart_config)
+            metric_col = None
+            metric_label = "Total Records"
+            metric_value = len(df)
+            metric_fmt = f"{metric_value:,}"
+            metric_icon = "📊"
+
+            if chart_config:
+                y_col = chart_config.get("Y_AXIS", "")
+                if y_col and y_col in df.columns and pd.api.types.is_numeric_dtype(df[y_col]):
+                    metric_col = y_col
+
+            if metric_col is None:
+                # Fallback: pick first numeric column
+                num_cols = df.select_dtypes(include="number").columns.tolist()
+                if num_cols:
+                    metric_col = num_cols[0]
+
+            if metric_col:
+                total = df[metric_col].sum()
+                metric_label = metric_col
+                # Smart formatting: large numbers with K / M suffix
+                if total >= 1_000_000:
+                    metric_fmt = f"{total / 1_000_000:,.2f}M"
+                elif total >= 1_000:
+                    metric_fmt = f"{total / 1_000:,.1f}K"
+                else:
+                    metric_fmt = f"{total:,.0f}"
+                metric_icon = "💰" if any(k in metric_col.lower() for k in ["profit", "income", "revenue", "value", "price", "cost", "amount"]) else "🔢"
+
+            row_count = len(df)
+            sub_text = f"{row_count:,} record{'s' if row_count != 1 else ''} returned"
+
+            st.markdown(f"""
+                <div class="canvas-kpi-card">
+                    <div class="canvas-kpi-icon">{metric_icon}</div>
+                    <div>
+                        <div class="canvas-kpi-label">{metric_label}</div>
+                        <div class="canvas-kpi-value">{metric_fmt}</div>
+                        <div class="canvas-kpi-sub">{sub_text}</div>
+                    </div>
+                </div>
+            """, unsafe_allow_html=True)
+
+            # ── 2. TABLE (left) + CHART (right) ─────────────────────────────────
+            col_table, col_chart = st.columns([1, 1], gap="medium")
+
+            with col_table:
+                st.markdown("<div class='canvas-section-title'>📋 Detail Data</div>", unsafe_allow_html=True)
+                st.dataframe(df, width="stretch", height=380)
+
+            with col_chart:
+                if chart_config:
+                    st.markdown("<div class='canvas-section-title'>📈 Chart Visualization</div>", unsafe_allow_html=True)
+                    render_chart(df, chart_config)
+                else:
+                    st.markdown("<div class='canvas-section-title'>📈 Chart Visualization</div>", unsafe_allow_html=True)
+                    st.info("No chart configuration was generated for this query.")
+
+        else:
+            import plotly.express as px
+            import plotly.graph_objects as go
+
+            # ── RICH EMPTY STATE: Showcase Dashboard ──────────────────────────
+            st.markdown("""
+                <div style='text-align:center; margin-bottom: 0.5rem;'>
+                    <h2 style='color:#1e293b; font-size:1.6rem; font-weight:700; margin-bottom:4px;'>
+                        📊 Your Analytics Workspace
+                    </h2>
+                    <p style='color:#94a3b8; font-size:0.9rem;'>
+                        Ask a question on the left — live charts &amp; tables will appear here instantly.
+                    </p>
+                </div>
+            """, unsafe_allow_html=True)
+
+            PALETTE = ["#4f46e5", "#7c3aed", "#ec4899", "#f59e0b", "#10b981", "#06b6d4"]
+            _layout = dict(
+                height=420,
+                margin=dict(l=10, r=10, t=50, b=20),
+                paper_bgcolor="rgba(0,0,0,0)",
+                plot_bgcolor="rgba(248,250,252,0.4)",
+                font=dict(color="#334155", family="'Rubik', sans-serif", size=12),
+                title_font=dict(size=16, color="#0f172a", family="'Rubik', sans-serif"),
+                legend=dict(orientation="h", yanchor="top", y=-0.05, xanchor="center", x=0.5, font_size=11),
+            )
+
+            st.markdown("<div style='height: 2rem;'></div>", unsafe_allow_html=True)
+            
+            # ── Row 1: Line Trend + Donut ──────────────────────────────────────
+            r1c1, r1c2 = st.columns([3, 2], gap="large")
+
+            with r1c1:
+                months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun",
+                          "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
+                trend_df = pd.DataFrame({
+                    "Month": months * 2,
+                    "Units Sold": [42,55,48,70,66,80,75,90,85,110,102,120,
+                                   30,38,35,50,48,62,58,72,68,88,82,95],
+                    "Brand": ["Toyota"]*12 + ["Honda"]*12,
+                })
+                fig_line = px.line(
+                    trend_df, x="Month", y="Units Sold", color="Brand",
+                    markers=True, title="Monthly Sales Trend",
+                    color_discrete_sequence=PALETTE,
+                )
+                fig_line.update_traces(line_width=3, marker=dict(size=8, line=dict(width=2, color="white")))
+                fig_line.update_layout(**_layout)
+                # Override legend for line chart to be at the top (to avoid overlap with X-axis)
+                fig_line.update_layout(legend=dict(yanchor="bottom", y=1.02, xanchor="right", x=1))
+                st.plotly_chart(fig_line, width="stretch", key="es_line")
+
+            with r1c2:
+                seg_df = pd.DataFrame({
+                    "Segment": ["SUV", "Sedan", "Truck", "Hatchback", "Van"],
+                    "Share": [38, 26, 18, 12, 6],
+                })
+                fig_donut = px.pie(
+                    seg_df, names="Segment", values="Share",
+                    hole=0.55, title="Vehicle Segment Mix",
+                    color_discrete_sequence=PALETTE,
+                )
+                fig_donut.update_traces(
+                    textposition="inside", textinfo="percent+label",
+                    insidetextorientation="radial",
+                    marker=dict(line=dict(color="#ffffff", width=2.5))
+                )
+                fig_donut.update_layout(**_layout)
+                st.plotly_chart(fig_donut, width="stretch", key="es_donut")
+
+    render_canvas_fragment()

@@ -57,17 +57,29 @@ def _normalize_chart_type(raw_type: str) -> str:
     return CHART_TYPE_ALIASES.get(t, t)
 
 
+def _match_column(target: str, columns: list) -> str:
+    """Helper to find the actual column name even if underscores/spaces/case differ."""
+    if not target: return target
+    if target in columns: return target
+    
+    t_norm = target.lower().replace("_", " ").strip()
+    for col in columns:
+        if col.lower().replace("_", " ").strip() == t_norm:
+            return col
+    return target
+
+
 def render_chart(df: pd.DataFrame, chart_config: dict):
     """Render a Plotly chart based on the configuration."""
     raw_type = chart_config.get("CHART_TYPE", "").lower()
     chart_type = _normalize_chart_type(raw_type)
 
-    x_axis = chart_config.get("X_AXIS")
-    y_axis = chart_config.get("Y_AXIS")
-    color  = chart_config.get("COLOR") or None  # empty string → None
+    x_axis = _match_column(chart_config.get("X_AXIS"), df.columns)
+    y_axis = _match_column(chart_config.get("Y_AXIS"), df.columns)
+    color  = _match_column(chart_config.get("COLOR"), df.columns) or None  # empty string → None
 
     common_kwargs = dict(
-        template="plotly_white",
+        template="seaborn",
         color_discrete_sequence=px.colors.qualitative.Safe,
     )
 
@@ -122,16 +134,26 @@ def render_chart(df: pd.DataFrame, chart_config: dict):
 
     # ── Pie ──────────────────────────────────────────────────────────────────
     elif chart_type == "pie":
-        if not x_axis or not y_axis:
-            st.warning("Pie chart requires X_AXIS (names) and Y_AXIS (values).")
-            return
+        # Auto-detect if missing
+        if not x_axis:
+            cats = df.select_dtypes(exclude="number").columns.tolist()
+            x_axis = cats[0] if cats else df.columns[0]
+        if not y_axis:
+            nums = df.select_dtypes(include="number").columns.tolist()
+            y_axis = nums[0] if nums else df.columns[-1]
+
         fig = px.pie(df, names=x_axis, values=y_axis, **common_kwargs)
 
     # ── Donut ────────────────────────────────────────────────────────────────
     elif chart_type == "donut":
-        if not x_axis or not y_axis:
-            st.warning("Donut chart requires X_AXIS (names) and Y_AXIS (values).")
-            return
+        # Auto-detect if missing
+        if not x_axis:
+            cats = df.select_dtypes(exclude="number").columns.tolist()
+            x_axis = cats[0] if cats else df.columns[0]
+        if not y_axis:
+            nums = df.select_dtypes(include="number").columns.tolist()
+            y_axis = nums[0] if nums else df.columns[-1]
+
         fig = px.pie(df, names=x_axis, values=y_axis, hole=0.45, **common_kwargs)
 
     # ── Scatter ──────────────────────────────────────────────────────────────
@@ -187,12 +209,13 @@ def render_chart(df: pd.DataFrame, chart_config: dict):
         return
 
     fig.update_layout(
-        margin=dict(l=20, r=20, t=40, b=20),
+        height=380,
+        margin=dict(l=20, r=20, t=40, b=60),
         paper_bgcolor="rgba(0,0,0,0)",
         plot_bgcolor="rgba(0,0,0,0)",
         font=dict(color="#212529", family="'Rubik', sans-serif"),
-        legend=dict(orientation="h", yanchor="bottom", y=1.02,
-                    xanchor="right", x=1),
+        legend=dict(orientation="h", yanchor="top", y=-0.12,
+                    xanchor="center", x=0.5),
     )
     st.plotly_chart(fig, width="stretch")
 
@@ -208,10 +231,16 @@ def parse_chart_config(text: str) -> dict:
             for line in config_lines:
                 if ":" in line:
                     key, value = line.split(":", 1)
-                    key = key.strip()
-                    value = value.strip()
-                    # Normalize COLOR/CATEGORY → COLOR
-                    if key.upper().startswith("COLOR"):
-                        key = "COLOR"
-                    config[key.strip().upper()] = value
+                    k = key.strip().upper()
+                    v = value.strip()
+                    
+                    # Normalize common aliases to X_AXIS, Y_AXIS, COLOR
+                    if any(x in k for x in ["NAMES", "LABEL", "CATEGORY", "X_AXIS", "X-AXIS"]):
+                        config["X_AXIS"] = v
+                    elif any(x in k for x in ["VALUES", "VALUE", "Y_AXIS", "Y-AXIS", "MEASURE"]):
+                        config["Y_AXIS"] = v
+                    elif any(x in k for x in ["COLOR", "LEGEND", "SERIES"]):
+                        config["COLOR"] = v
+                    else:
+                        config[k] = v
     return config
